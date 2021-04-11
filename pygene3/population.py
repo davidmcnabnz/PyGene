@@ -2,6 +2,8 @@
 pygene/population.py - Represents a population of organisms
 """
 
+import sys
+import traceback
 import random
 from random import randrange, choice
 from math import sqrt
@@ -74,6 +76,10 @@ class Population(PGXmlMixin):
     # set this to true to mutate all progeny
     mutateAfterMating = True
 
+    # set this to the maximum number of generations permitted for which there is no
+    # fitness gain, when running with the 'optimise' method.
+    maxGensWithoutGain = 100
+
     def __init__(self, *items, **kw):
         """
         Create a population with zero or more members
@@ -107,6 +113,10 @@ class Population(PGXmlMixin):
         if not items:
             for i in range(init):
                 self.add(species())
+
+        maxGens = kw.get('maxGensWithoutGain', None)
+        if maxGens is not None:
+            self.maxGensWithoutGain = maxGens
 
     def add(self, *args):
         """
@@ -275,6 +285,69 @@ class Population(PGXmlMixin):
         self.sorted = True
 
         #return stats
+
+    def optimise(self, maxGensWithoutGain=None, **kw):
+        """
+        Run continuous generations, monitoring the fitness of the best
+        organism each time. Stop after 'maxGensWithoutGain' generations
+        have passed without a gain in fitness.
+
+        :param maxGensWithoutGain: if given, will set a ceiling on the maximum
+        number of generations this method runs for without quitting. If not given,
+        will use the object or class attribute of the same name instead.
+
+        :kw allows parameters such as 'verbosity' (default 0, silent, up to 2)
+
+        :return: the fittest organism, after running maxGensWithoutGain generations
+        without a fitness gain
+        """
+        verbosity = kw.get('verbosity', 0)
+        generations = 0
+        generationsWithoutFitnessGain = 0
+        allTimeBestOrg = None
+        allTimeBestFitness = sys.float_info.max
+        if maxGensWithoutGain is None:
+            maxGensWithoutGain = self.maxGensWithoutGain
+        try:
+            # do first generation to set the benchmark
+            self.gen()
+            best = self.organisms[0]
+            fitness = best.get_fitness()
+            allTimeBestOrg = best
+            allTimeBestFitness = fitness
+            generations = 1
+
+            # now run successive generations in search of improvement
+            while True:
+                self.gen()
+                generations += 1
+
+                # and dump it out
+                #print [("%.2f %.2f" % (o['x1'], o['x2'])) for o in pop.organisms]
+                best = self.organisms[0]
+                fitness = best.get_fitness()
+
+                if fitness < allTimeBestFitness:
+                    generationsWithoutFitnessGain = 0
+                    allTimeBestOrg = best
+                    allTimeBestFitness = fitness
+                    if verbosity > 0:
+                        print("gens=%d/%d org=%s" % (
+                            generationsWithoutFitnessGain, generations,
+                            allTimeBestOrg))
+                    continue
+
+                generationsWithoutFitnessGain += 1
+                if generationsWithoutFitnessGain >= maxGensWithoutGain:
+                    # give up, not going to improve
+                    print("No fitness improvement after %d generations - quit" % generationsWithoutFitnessGain)
+                    return allTimeBestOrg
+
+        except Exception:
+            if verbosity > 0:
+                traceback.print_exc()
+            return None
+
     def __repr__(self):
         """
         crude human-readable dump of population's members

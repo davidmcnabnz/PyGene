@@ -79,29 +79,11 @@ class QPopulation(Population):
 
 # create a new population, with randomly created members
 
-pop = QPopulation()
-
-
 # now a func to run the population
 def main():
-    try:
-        generations = 0
-        while True:
-            # execute a generation
-            pop.gen()
-            generations += 1
-
-            # and dump it out
-            #print [("%.2f %.2f" % (o['x1'], o['x2'])) for o in pop.organisms]
-            best = pop.organisms[0]
-            print("fitness=%f x1=%f x2=%f" % (best.get_fitness(), best['x1'], best['x2']))
-            if best.get_fitness() < 0.6:
-                break
-
-    except KeyboardInterrupt:
-        pass
-    print("Executed", generations, "generations")
-
+    pop = QPopulation()
+    best = pop.optimise(1000, verbosity=1)
+    print("Best=%s" % best)
 
 if __name__ == '__main__':
     main()

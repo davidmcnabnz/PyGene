@@ -40,7 +40,6 @@ class BaseGene(PGXmlMixin):
         else:
             self.value = self.__class__.value
 
-
     def copy(self):
         """
         returns clone of this gene
@@ -92,6 +91,18 @@ class BaseGene(PGXmlMixin):
         """
         raise Exception("Method 'randomValue' not implemented")
 
+    def f(self, *args, **kw):
+        """
+        Any gene class may implement this method, which is a function acting
+        on some given value and producing a given result.
+
+        Example: LinearGene with values a and b, takes arg x and produces y = ax + b
+        :param arg:
+        :return:
+        """
+        raise NotImplementedError(
+            "Gene class %s has not implemented required method 'f'" % self.__class__.__name__)
+
     def xmlDumpSelf(self, doc, parent):
         """
         dump out this gene into parent tag
@@ -114,7 +125,6 @@ class BaseGene(PGXmlMixin):
         sets attributes of tag
         """
         tag.setAttribute("mutProb", str(self.mutProb))
-
 
 class ComplexGene(BaseGene):
     """
@@ -148,7 +158,6 @@ class ComplexGene(BaseGene):
         """
         return (self.value + other.value) / 2.0
         #return abs(complex(self.value.real, other.value.imag))
-
 
     def mutate(self):
         """
@@ -255,7 +264,6 @@ class FloatGene(BaseGene):
             # mutate upwards:
             self.value += uniform(0, self.mutAmt * (self.randMax-self.value))
 
-
     def randomValue(self):
         """
         Generates a plausible random value
@@ -264,8 +272,6 @@ class FloatGene(BaseGene):
         Override as needed
         """
         return uniform(self.randMin, self.randMax)
-
-
 
 class FloatGeneRandom(FloatGene):
     """
@@ -279,7 +285,6 @@ class FloatGeneRandom(FloatGene):
         """
         self.value = self.randomValue()
 
-
 class FloatGeneRandRange(FloatGene):
     def __add__(self, other):
         """
@@ -289,7 +294,6 @@ class FloatGeneRandRange(FloatGene):
         start = min([self.value, other.value])
         end = max([self.value, other.value])
         return uniform(start, end)
-
 
 class FloatGeneMax(FloatGene):
     """
@@ -315,6 +319,95 @@ class FloatGeneExchange(FloatGene):
         """
         return choice([self.value, other.value])
 
+class FloatMultFuncGene(FloatGene):
+
+    def f(self, x):
+        return self.value * x
+
+class FloatAddFuncGene(FloatGene):
+
+    def f(self, x):
+        return self.value + x
+
+class FloatLinearFuncGene(BaseGene):
+    """
+    Evolves linear functions f(x) = ax + b
+    """
+    mutAmtA = 0.1
+    mutAmtB = 0.1
+
+    # used for random gene creation
+    # override in subclasses
+    randMin = -1.0
+    randMax = 1.0
+
+    # Acceptable fields for factory
+    fields = ["value", "mutProb", "mutAmtA", "mutAmtB",
+              "randMin", "randMax"]
+
+    def __add__(self, other):
+        """
+        Combines two genes in a gene pair, to produce an effect
+
+        This is used to determine the gene's phenotype
+
+        This class computes the arithmetic mean
+        of the two genes' values, so is akin to incomplete
+        dominance.
+
+        Override if desired
+        """
+        aSelf, bSelf = self.value
+        aOther, bOther = other.value
+
+        return (aSelf + aOther) / 2.0, (bSelf + bOther) / 2.0
+
+    def mutate(self):
+        """
+        Mutate this gene's value by a random amount
+        within the range +/- self.mutAmt
+
+        perform mutation IN-PLACE, ie don't return mutated copy
+        """
+        self.value += complex(
+            uniform(-self.mutAmtA, self.mutAmtA),
+            uniform(-self.mutAmtB, self.mutAmtB)
+            )
+
+        # if the gene has wandered outside the alphabet,
+        # rein it back in
+        a, b = self.value
+
+        if a < self.randMin:
+            a = self.randMin
+        elif a > self.randMax:
+            a = self.randMax
+
+        if b < self.randMin:
+            b = self.randMin
+        elif b > self.randMax:
+            b = self.randMax
+
+        self.value = (a,b)
+
+    def randomValue(self):
+        """
+        Generates a plausible random value
+        for this gene.
+
+        Override as needed
+        """
+        min = self.randMin
+        range = self.randMax - min
+
+        a = uniform(self.randMin, self.randMax)
+        b = uniform(self.randMin, self.randMax)
+
+        return (a, b)
+
+    def f(self, x):
+        a, b = self.value
+        return a * x + b
 
 class IntGene(BaseGene):
     """
@@ -595,8 +688,6 @@ class BitGene(BaseGene):
         Produces the 'phenotype' as xor of gene pair values
         """
         raise Exception("__add__ method not implemented")
-
-
 
     def mutate(self):
         """

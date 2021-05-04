@@ -249,16 +249,17 @@ class Organism(BaseOrganism):
             # if we're handed a gene class instead of a gene object
             # we need to instantiate the gene class
             # to form the needed gene object
-            if type(gene) == type and issubclass(gene, BaseGene):
-                gene = gene()
-            elif not isinstance(gene, BaseGene):
-                # If it wasn't a subclass check if it's an instance
-                raise Exception(
-                    "object given as gene %s %s is not a gene" % (
-                        name, repr(gene)))
+            geneInst = gene
+            if not isinstance(geneInst, BaseGene):
+                if callable(geneInst):
+                    geneInst = geneInst()
+                else:
+                    raise Exception("%s can't produce a gene - it's not callable" % str(gene))
+                if not isinstance(geneInst, BaseGene):
+                    raise Exception("%s did not produce a Gene" % str(gene))
 
             # all good - add in the gene to our genotype
-            self.genes[name] = gene
+            self.genes[name] = geneInst
 
     def copy(self):
         """

@@ -80,6 +80,9 @@ class Population(PGXmlMixin):
     # fitness gain, when running with the 'optimise' method.
     maxGensWithoutGain = 100
 
+    # default verbosity level - the amount of print() noise desired, 0=silent
+    verbosity = 0
+
     def __init__(self, *items, **kw):
         """
         Create a population with zero or more members
@@ -117,6 +120,10 @@ class Population(PGXmlMixin):
         maxGens = kw.get('maxGensWithoutGain', None)
         if maxGens is not None:
             self.maxGensWithoutGain = maxGens
+
+        verbosity = kw.get('verbosity', None)
+        if verbosity is not None:
+            self.verbosity = verbosity
 
     def add(self, *args):
         """
@@ -301,7 +308,7 @@ class Population(PGXmlMixin):
         :return: the fittest organism, after running maxGensWithoutGain generations
         without a fitness gain
         """
-        verbosity = kw.get('verbosity', 0)
+        verbosity = kw.get('verbosity', self.verbosity)
         generations = 0
         generationsWithoutFitnessGain = 0
         allTimeBestOrg = None
@@ -323,24 +330,28 @@ class Population(PGXmlMixin):
                 generations += 1
 
                 # and dump it out
-                #print [("%.2f %.2f" % (o['x1'], o['x2'])) for o in pop.organisms]
                 best = self.organisms[0]
                 fitness = best.get_fitness()
 
+                if verbosity > 1:
+                    print("Gen %d: %s" % (generations, best))
+
                 if fitness < allTimeBestFitness:
-                    generationsWithoutFitnessGain = 0
                     allTimeBestOrg = best
                     allTimeBestFitness = fitness
                     if verbosity > 0:
-                        print("gens=%d/%d org=%s" % (
+                        print("Fitness Gain: gens=%d/%d org=%s" % (
                             generationsWithoutFitnessGain, generations,
                             allTimeBestOrg))
+                    generationsWithoutFitnessGain = 0
                     continue
 
                 generationsWithoutFitnessGain += 1
+
                 if generationsWithoutFitnessGain >= maxGensWithoutGain:
                     # give up, not going to improve
-                    print("No fitness improvement after %d generations - quit" % generationsWithoutFitnessGain)
+                    if verbosity > 0:
+                        print("Limit: best after %d gens: %s" % (generations, allTimeBestOrg))
                     return allTimeBestOrg
 
         except Exception:

@@ -31,7 +31,7 @@ class BaseGene(PGXmlMixin):
     # List of acceptable fields for the factory
     fields = ["value", "mutProb"]
 
-    def __init__(self):
+    def __init__(self, **kw):
 
         # if value is not provided, it will be
         # randomly generated
@@ -47,7 +47,6 @@ class BaseGene(PGXmlMixin):
         cls = self.__class__()
         cls.value = self.value
         return cls
-
 
     def __add__(self, other):
         """
@@ -319,17 +318,17 @@ class FloatGeneExchange(FloatGene):
         """
         return choice([self.value, other.value])
 
-class FloatMultFuncGene(FloatGene):
+class FloatMultGene(FloatGene):
 
     def f(self, x):
         return self.value * x
 
-class FloatAddFuncGene(FloatGene):
+class FloatAddGene(FloatGene):
 
     def f(self, x):
         return self.value + x
 
-class FloatLinearFuncGene(BaseGene):
+class FloatLinearGene(BaseGene):
     """
     Evolves linear functions f(x) = ax + b
     """
@@ -369,11 +368,6 @@ class FloatLinearFuncGene(BaseGene):
 
         perform mutation IN-PLACE, ie don't return mutated copy
         """
-        self.value += complex(
-            uniform(-self.mutAmtA, self.mutAmtA),
-            uniform(-self.mutAmtB, self.mutAmtB)
-            )
-
         # if the gene has wandered outside the alphabet,
         # rein it back in
         a, b = self.value
@@ -397,9 +391,6 @@ class FloatLinearFuncGene(BaseGene):
 
         Override as needed
         """
-        min = self.randMin
-        range = self.randMax - min
-
         a = uniform(self.randMin, self.randMax)
         b = uniform(self.randMin, self.randMax)
 
@@ -408,6 +399,95 @@ class FloatLinearFuncGene(BaseGene):
     def f(self, x):
         a, b = self.value
         return a * x + b
+
+class FloatTupleGene(BaseGene):
+    """
+    Carries a tuple of floats
+    """
+    # amount by which to mutate, will change value
+    # by up to +/- this amount
+    mutAmt = 0.1
+
+    # used for random gene creation
+    # override in subclasses
+    randMin = -1.0
+    randMax = 1.0
+
+    # Acceptable fields for factory
+    fields = ["size", "value", "mutProb", "mutAmt", "randMin", "randMax"]
+
+    size = 1 # default to just 1 element
+
+    def __init__(self, size=None, **kw):
+        if size is not None:
+            self.size = size
+        super().__init__(**kw)
+
+    def __add__(self, other):
+        """
+        Combines two genes in a gene pair, to produce an effect
+
+        This is used to determine the gene's phenotype
+
+        This class computes the arithmetic mean
+        of the two genes' values, so is akin to incomplete
+        dominance.
+
+        Override if desired
+        """
+        thisVals = self.value
+        otherVals = other.value
+        newVals = []
+        for thisVal, otherVal in zip(thisVals, otherVals):
+            newVals.append((thisVal + otherVal) / 2.0)
+        return newVals
+
+    def mutate(self):
+        """
+        Mutate this gene's value by a random amount
+        within the range, which is determined by
+        multiplying self.mutAmt by the distance of the
+        gene's current value from either endpoint of legal values
+
+        perform mutation IN-PLACE, ie don't return mutated copy
+        """
+        newVals = []
+        if random() < 0.5:
+            # mutate downwards
+            #self.value -= uniform(0, self.mutAmt * (self.value-self.randMin))
+            for val in self.value:
+                newVals.append(val + uniform(0, self.mutAmt * (val - self.randMin)))
+        else:
+            # mutate upwards:
+            #self.value += uniform(0, self.mutAmt * (self.randMax-self.value))
+            for val in self.value:
+                newVals.append(val - uniform(0, self.mutAmt * (val - self.randMin)))
+        self.value = newVals
+
+    def randomValue(self):
+        """
+        Generates a plausible random value
+        for this gene.
+
+        Override as needed
+        """
+        return [uniform(self.randMin, self.randMax) for i in range(self.size)]
+
+    def f(self, xVals):
+        yVals = []
+        for vali, xi in zip(self.value, xVals):
+            try:
+                yVals.append(vali * xi)
+            except TypeError:
+                print("Mismatched data")
+        return yVals
+
+    @staticmethod
+    def ofLength(n, **kw):
+        def cons():
+            inst = FloatTupleGene(n, **kw)
+            return inst
+        return cons
 
 class IntGene(BaseGene):
     """
